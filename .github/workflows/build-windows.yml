@@ -1,4 +1,4 @@
-name: Build and publish JinhakON v1.0.6 (original Go / Edge)
+name: Build and publish JinhakON v1.0.7 (original Go / Edge)
 on:
   workflow_dispatch:
   push:
@@ -8,7 +8,7 @@ on:
       - 'legacy/**'
       - 'scripts/**'
       - 'package.json'
-      - 'docs/RELEASE_NOTES_1.0.6.md'
+      - 'docs/RELEASE_NOTES_1.0.7.md'
       - '.github/workflows/build-windows.yml'
 permissions:
   contents: write
@@ -44,13 +44,13 @@ jobs:
           Pop-Location
           Copy-Item legacy/launcher/JinhakON.exe legacy/installer/JinhakON.exe -Force
           Push-Location legacy/installer
-          go build -trimpath -ldflags '-H windowsgui -s -w' -o JinhakON_Setup_1.0.6.exe .
+          go build -trimpath -ldflags '-H windowsgui -s -w' -o JinhakON_Setup_1.0.7.exe .
           if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
           Pop-Location
       - name: Verify Windows installer
         shell: pwsh
         run: |
-          $exe='legacy/installer/JinhakON_Setup_1.0.6.exe'
+          $exe='legacy/installer/JinhakON_Setup_1.0.7.exe'
           if ((Get-Item $exe).Length -lt 5000000) { throw 'Unexpected installer size' }
           $header=[IO.File]::ReadAllBytes($exe)[0..1]
           if ($header[0] -ne 77 -or $header[1] -ne 90) { throw 'Not a Windows executable' }
@@ -58,9 +58,9 @@ jobs:
       - name: Upload reproducible installation archive
         uses: actions/upload-artifact@v4
         with:
-          name: JinhakON_Setup_1.0.6
+          name: JinhakON_Setup_1.0.7
           path: |
-            legacy/installer/JinhakON_Setup_1.0.6.exe
+            legacy/installer/JinhakON_Setup_1.0.7.exe
             docs/ORIGINAL_UPDATE.md
           if-no-files-found: error
       - name: Publish official GitHub release
@@ -68,13 +68,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $installer='legacy/installer/JinhakON_Setup_1.0.6.exe'
-          gh release view v1.0.6 --repo "$env:GITHUB_REPOSITORY" *> $null
+          $installer='legacy/installer/JinhakON_Setup_1.0.7.exe'
+          gh release view v1.0.7 --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload v1.0.6 "$installer" --clobber --repo "$env:GITHUB_REPOSITORY"
+            gh release upload v1.0.7 "$installer" --clobber --repo "$env:GITHUB_REPOSITORY"
           } else {
-            gh release create v1.0.6 "$installer" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "진학ON v1.0.6" --notes-file "docs/RELEASE_NOTES_1.0.6.md" --latest
+            gh release create v1.0.7 "$installer" --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "진학ON v1.0.7" --notes-file "docs/RELEASE_NOTES_1.0.7.md" --latest
           }
           if ($LASTEXITCODE -ne 0) { throw "Official release publishing failed" }
-          gh release view v1.0.6 --repo "$env:GITHUB_REPOSITORY" --json tagName,url,assets
+          gh release view v1.0.7 --repo "$env:GITHUB_REPOSITORY" --json tagName,url,assets
           if ($LASTEXITCODE -ne 0) { throw "Release verification failed" }
