@@ -9,7 +9,8 @@ if(begin<0||end<=begin)throw Error('App JavaScript missing');
 const js=html.slice(begin+8,end);
 new vm.Script(js,{filename:'app/index.html'});
 const checks=[
- ['version','const APP_VERSION="1.0.6"'],
+ ['no sidebar audit', 'onclick="switchView(\'audit\')"'],
+ ['version','const APP_VERSION="1.0.7"'],
  ['exact admission','function exactAdmission(r)'],
  ['unique application key','const appKey=r=>["JK2"'],
  ['legacy migration','function jFixMigrateState()'],
@@ -19,4 +20,6 @@ const checks=[
  ['offline SQLite','./vendor/sql-asm.js']
 ];
 for(const [name,needle] of checks){if(!html.includes(needle))throw Error('Missing '+name)}
-console.log('v1.0.6 source verified:',checks.map(x=>x[0]).join(', '));
+if (html.includes('class="navbtn" data-view="audit"')) throw Error('Audit must not be in sidebar');
+if (html.includes('["audit","전형 점검"]')) throw Error('Audit must not be a user-toggle menu');
+console.log('v1.0.7 source verified:',checks.map(x=>x[0]).join(', '));
