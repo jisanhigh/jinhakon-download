@@ -707,6 +707,7 @@ tbody tr:last-child td{border-bottom:0!important}
    <button class="navbtn on" data-view="dash">▦ 대시보드</button>
    <button class="navbtn" data-view="student">👤 학생관리</button>
    <button class="navbtn" data-view="univ">▥ 대학별 지원</button>
+   <button class="navbtn" data-view="audit">전형 점검</button>
    <button class="navbtn" data-view="minimum">◎ 수능최저</button>
    <button class="navbtn" data-view="schedule">◷ 전형 일정</button>
    <button class="navbtn" data-view="caldb">▣ 합격발표 DB</button>
@@ -716,6 +717,7 @@ tbody tr:last-child td{border-bottom:0!important}
    <section id="dashView" class="view on"></section>
    <section id="studentView" class="view"></section>
    <section id="univView" class="view"></section>
+   <section id="auditView" class="view"></section>
    <section id="todoView" class="view"></section>
    <section id="minimumView" class="view"></section>
    <section id="scheduleView" class="view"></section>
@@ -733,7 +735,13 @@ const KEY="jinhakON.v1";
 const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const val=(o,...ks)=>{for(const k of ks)if(o[k]!=null&&String(o[k]).trim()!=="")return String(o[k]).trim();return ""};
 const studentKey=r=>[r.grade,r.ban,r.no,r.name].join("|");
-const appKey=r=>[studentKey(r),r.university,r.admission,r.major].join("|");
+// v1.0.6: 구형 키는 자료 이전 용도로만 사용합니다.
+const legacyAppKey=r=>[studentKey(r),r.university,r.admission,r.major].join("|");
+function exactAdmission(r){return String(r.detail||r.admission||r.kind||"").trim()}
+function jFixNorm(v){return String(v??"").normalize("NFKC").replace(/\s+/g," ").trim()}
+function jFixYear(r){return String(r.schoolYear || ((typeof CFG!=="undefined"&&CFG&&CFG.schoolYear)||new Date().getFullYear()+1))}
+const appKey=r=>["JK2",jFixYear(r),studentKey(r),r.university,r.kind,r.admission,r.detail,r.major]
+  .map(x=>encodeURIComponent(jFixNorm(x))).join("|");
 let resultText=r=>r.final||r.step1||"";
 let hasResult=r=>!!resultText(r);
 
@@ -867,7 +875,7 @@ function renderStudent(){
  let detail=`<div class=detail-empty>왼쪽에서 학생을 선택하세요.</div>`;
  if(S.selected){const s=S.students.find(x=>x.key===S.selected);if(s){const ns=notes()[s.key]||[];detail=`<div class=student-head><div><h2>${esc(s.name)}</h2><div class=meta>${s.grade}학년 ${s.ban}반 ${s.no}번 · 지원 ${s.apps.length}건 · 상담 ${ns.length}회</div></div><button class="secondary no-print" onclick="window.print()">상담자료 인쇄</button></div>
  <div class=tabs><button class="tab on" onclick="tab(this,'apps')">지원현황</button><button class=tab onclick="tab(this,'counsel')">상담기록</button><button class=tab onclick="tab(this,'summary')">상담요약</button></div>
- <div id=appsPane class="tabpane on"><div class=card style="padding:0;overflow:auto"><table><thead><tr><th>대학</th><th>모집단위</th><th>전형</th><th>환산등급</th><th>최저</th><th>1단계</th><th>최종</th><th>등록</th></tr></thead><tbody>${s.apps.map((r,i)=>`<tr class=click onclick="showReq('${esc(s.key)}',${i})"><td><b>${esc(r.university)}</b></td><td>${esc(r.major)}</td><td>${esc(r.admission||r.kind)}</td><td>${esc(r.gpa)}</td><td>${r.minimum?'<span class="badge warn">있음</span>':'<span class="badge">없음</span>'}</td><td>${esc(r.step1)}</td><td>${esc(r.final)}</td><td>${esc(r.register)}</td></tr>`).join("")}</tbody></table></div><div id=reqBox class=req>대학 행을 누르면 대교협 수능최저 원문이 표시됩니다.</div></div>
+ <div id=appsPane class="tabpane on"><div class=card style="padding:0;overflow:auto"><table><thead><tr><th>대학</th><th>모집단위</th><th>전형</th><th>환산등급</th><th>최저</th><th>1단계</th><th>최종</th><th>등록</th></tr></thead><tbody>${s.apps.map((r,i)=>`<tr class=click onclick="showReq('${esc(s.key)}',${i})"><td><b>${esc(r.university)}</b></td><td>${esc(r.major)}</td><td>${esc(exactAdmission(r))}</td><td>${esc(r.gpa)}</td><td>${r.minimum?'<span class="badge warn">있음</span>':'<span class="badge">없음</span>'}</td><td>${esc(r.step1)}</td><td>${esc(r.final)}</td><td>${esc(r.register)}</td></tr>`).join("")}</tbody></table></div><div id=reqBox class=req>대학 행을 누르면 대교협 수능최저 원문이 표시됩니다.</div></div>
  <div id=counselPane class=tabpane><div class=card><div class=toolbar><select id=cat><option>수시전략</option><option>지원결정</option><option>수능최저</option><option>정시전략</option><option>학부모상담</option><option>기타</option></select></div><textarea id=memo placeholder="상담 내용을 기록하세요."></textarea><div style="text-align:right;margin-top:8px"><button class=primary onclick="addMemo('${esc(s.key)}')">상담기록 저장</button></div></div><div class=timeline>${ns.map(n=>`<div class=event><b>${esc(n.cat)}</b><small>${esc(n.day)}</small><p>${esc(n.memo)}</p></div>`).join("")||'<div class=card>아직 상담기록이 없습니다.</div>'}</div></div>
  <div id=summaryPane class=tabpane><div class=card><h3>상담 전 확인</h3><p>지원 ${s.apps.length}건 · 수능최저 적용 ${s.apps.filter(x=>x.minimum).length}건 · 결과 입력 ${s.apps.filter(hasResult).length}건</p><div class=todo>${issueFor(s).map(x=>`<span class="badge warn">${esc(x)}</span>`).join("")||'<span class="badge good">확인 필요 항목 없음</span>'}</div></div></div>`}}
  $("#studentView").innerHTML=`<div class=pagehead><div><h2>학생 진학카드</h2><p>학생별 지원·최저·상담·결과를 한 화면에서 확인합니다.</p></div></div><div class=student-layout><div class=card style="padding:10px"><div class=toolbar><select id=banFilter onchange=renderStudent()><option value="">전체 반</option>${bans.map(b=>`<option ${ban===b?"selected":""}>${b}</option>`).join("")}</select><input id=stuSearch class=search placeholder="이름 또는 번호" value="${esc(q)}" oninput="renderStudent()"></div><div class=list>${list.map(x=>`<div class="stu ${S.selected===x.key?"on":""}" onclick="pickStudent('${esc(x.key)}')"><b>${x.ban}반 ${x.no}번 ${esc(x.name)}</b><small>지원 ${x.apps.length}건 · 상담 ${(notes()[x.key]||[]).length}회</small></div>`).join("")}</div></div><div>${detail}</div></div>`;
@@ -881,7 +889,7 @@ function renderUniv(){
  const a=[...m].sort((x,y)=>y[1].length-x[1].length);
  $("#univView").innerHTML=`<div class=pagehead><div><h2>대학별 지원</h2><p>학교 전체의 대학별 지원 규모와 학생 수를 확인합니다.</p></div></div><div class=card><table><thead><tr><th>대학</th><th>지원 학생</th><th>원서</th><th>결과 입력</th></tr></thead><tbody>${a.map(([u,rs])=>`<tr class=click onclick="showUniv('${esc(u).replace(/'/g,"&#39;")}')"><td><b>${esc(u)}</b></td><td>${new Set(rs.map(studentKey)).size}명</td><td>${rs.length}건</td><td>${rs.filter(hasResult).length}건</td></tr>`).join("")}</tbody></table></div>`;
 }
-function showUniv(u){const rs=S.rows.filter(r=>r.university===u);openModal(`<h3>${esc(u)} 지원자</h3><table><thead><tr><th>학생</th><th>모집단위</th><th>전형</th><th>결과</th></tr></thead><tbody>${rs.map(r=>`<tr><td>${r.ban}반 ${r.no}번 ${esc(r.name)}</td><td>${esc(r.major)}</td><td>${esc(r.admission)}</td><td>${esc(resultText(r))}</td></tr>`).join("")}</tbody></table>`)}
+function showUniv(u){const rs=S.rows.filter(r=>r.university===u);openModal(`<h3>${esc(u)} 지원자</h3><table><thead><tr><th>학생</th><th>모집단위</th><th>전형</th><th>결과</th></tr></thead><tbody>${rs.map(r=>`<tr><td>${r.ban}반 ${r.no}번 ${esc(r.name)}</td><td>${esc(r.major)}</td><td>${esc(exactAdmission(r))}</td><td>${esc(resultText(r))}</td></tr>`).join("")}</tbody></table>`)}
 function renderTodo(){const a=S.students.map(s=>[s,issueFor(s)]).filter(x=>x[1].length);$("#todoView").innerHTML=`<div class=pagehead><div><h2>확인 필요 업무</h2><p>담임이 다시 확인해야 할 학생을 자동으로 모읍니다.</p></div></div><div class=card><table><thead><tr><th>학생</th><th>지원</th><th>상담</th><th>확인사항</th></tr></thead><tbody>${a.map(([s,i])=>`<tr class=click onclick="pickStudent('${esc(s.key)}')"><td><b>${s.ban}반 ${s.no}번 ${esc(s.name)}</b></td><td>${s.apps.length}</td><td>${(notes()[s.key]||[]).length}</td><td class=todo>${i.map(x=>`<span class="badge warn">${esc(x)}</span>`).join("")}</td></tr>`).join("")}</tbody></table></div>`}
 function normDate(x){if(!x)return "";const m=String(x).match(/(20\d{2})[.\-\/ ]*(\d{1,2})[.\-\/ ]*(\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`:String(x)}
 function renderSchedule(){let a=[];S.rows.forEach(r=>{[["면접",r.interview],["논술",r.essay],["최종발표",r.announce]].forEach(([t,d])=>{if(d)a.push({d:normDate(d),t,r})})});a.sort((x,y)=>x.d.localeCompare(y.d));$("#scheduleView").innerHTML=`<div class=pagehead><div><h2>전형 일정</h2><p>대교협 파일에 포함된 면접·실기·논술·적성·발표 일정을 모읍니다.</p></div></div><div class=card><table><thead><tr><th>일자</th><th>구분</th><th>학생</th><th>대학</th><th>모집단위</th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.d)}</b></td><td><span class=badge>${x.t}</span></td><td>${x.r.ban}반 ${x.r.no}번 ${esc(x.r.name)}</td><td>${esc(x.r.university)}</td><td>${esc(x.r.major)}</td></tr>`).join("")||'<tr><td colspan=5>일정 데이터가 없습니다.</td></tr>'}</tbody></table></div>`}
@@ -1050,7 +1058,7 @@ function backupV2(){
  const d=snapshot();d.local=loadLocal();const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:"application/json"}));a.download=`진학ON_백업_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
 }
 function restoreBackup(){
- const i=document.createElement("input");i.type="file";i.accept=".json";i.onchange=async()=>{try{const d=JSON.parse(await i.files[0].text());S.rows=d.rows||[];S.file=d.file||"백업 복원";S.changes=d.changes||[];S.manualEvents=d.manualEvents||[];if(d.local)localStorage.setItem(KEY,JSON.stringify(d.local));buildStudents();openApp();render()}catch(e){alert("백업 파일을 읽지 못했습니다.")}};i.click()
+ const i=document.createElement("input");i.type="file";i.accept=".json";i.onchange=async()=>{try{const d=JSON.parse(await i.files[0].text());S.rows=d.rows||[];S.file=d.file||"백업 복원";S.changes=d.changes||[];S.manualEvents=d.manualEvents||[];if(d.local)localStorage.setItem(KEY,JSON.stringify(d.local));jFixMigrateState();buildStudents();openApp();render()}catch(e){alert("백업 파일을 읽지 못했습니다.")}};i.click()
 }
 if($("#lockSaveBtn"))$("#lockSaveBtn").onclick=saveVault;if($("#blindBtn"))$("#blindBtn").onclick=toggleBlind;if($("#saveBtn"))$("#saveBtn").onclick=()=>{if(confirm("확인: JSON 백업 파일을 저장합니다.\n취소: 백업 파일을 불러옵니다."))backupV2();else restoreBackup()};
 if($("#loginBtn"))$("#loginBtn").onclick=loginVault;if($("#loginPw"))$("#loginPw").addEventListener("keydown",e=>{if(e.key==="Enter")loginVault()});if($("#freshBtn"))$("#freshBtn").onclick=freshStart;
@@ -1117,7 +1125,7 @@ function renderMinimum(){
  const a=S.rows.filter(r=>r.minimum&&(!q||r.name.includes(q)||r.university.includes(q)||r.major.includes(q)));
  $("#minimumView").innerHTML=`<div class=pagehead><div><h2>수능최저 관리</h2><p>대교협의 최저학력기준 원문을 학생·대학별로 모아 확인합니다.</p></div></div>
  <div class=toolbar><input id=minSearch class=search value="${esc(q)}" placeholder="학생·대학·모집단위 검색" oninput=renderMinimum()><span class=badge>${a.length}건</span></div>
- <div class=card><table><thead><tr><th>학생</th><th>대학</th><th>모집단위</th><th>전형</th><th>구분</th><th>최저 원문</th></tr></thead><tbody>${a.map(r=>{const z=minimumLevel(r);return `<tr><td class=pname>${r.ban}반 ${r.no}번 ${esc(r.name)}</td><td><b>${esc(r.university)}</b></td><td>${esc(r.major)}</td><td>${esc(r.admission||r.kind)}</td><td><span class="badge ${z.c}">${z.t}</span></td><td style="max-width:480px;white-space:normal;line-height:1.5">${esc(r.minimum)}</td></tr>`}).join("")||'<tr><td colspan=6>수능최저가 기재된 지원자료가 없습니다.</td></tr>'}</tbody></table></div>`;
+ <div class=card><table><thead><tr><th>학생</th><th>대학</th><th>모집단위</th><th>전형</th><th>구분</th><th>최저 원문</th></tr></thead><tbody>${a.map(r=>{const z=minimumLevel(r);return `<tr><td class=pname>${r.ban}반 ${r.no}번 ${esc(r.name)}</td><td><b>${esc(r.university)}</b></td><td>${esc(r.major)}</td><td>${esc(exactAdmission(r))}</td><td><span class="badge ${z.c}">${z.t}</span></td><td style="max-width:480px;white-space:normal;line-height:1.5">${esc(r.minimum)}</td></tr>`}).join("")||'<tr><td colspan=6>수능최저가 기재된 지원자료가 없습니다.</td></tr>'}</tbody></table></div>`;
 }
 function todayTasks(){
  const today=new Date().toISOString().slice(0,10), ev=allEvents(), soon=new Date();soon.setDate(soon.getDate()+7);const soonS=soon.toISOString().slice(0,10);
@@ -1196,7 +1204,7 @@ const db=$("#demoBtn");if(db)db.remove();
 
 
 // ===== 진학ON v5 관리자 설정 / 유지보수 =====
-const APP_VERSION="9.8.0";
+const APP_VERSION="1.0.6";
 const SETTINGS_KEY="jinhakON.settings.v5";
 
 const DEFAULT_SETTINGS={
@@ -1210,11 +1218,11 @@ const DEFAULT_SETTINGS={
   counselingCategories:["수시전략","지원결정","수능최저","면접·논술","정시전략","학부모상담","기타"],
   resultStates:["합격","불합격","충원합격","예비","등록"],
   eventTypes:["면접","실기","논술","적성","1단계 발표","최종발표","상담","기타"],
-  menus:{dash:true,student:true,univ:true,minimum:true,schedule:true,caldb:true,changes:true},
+  menus:{dash:true,student:true,univ:true,audit:true,minimum:true,schedule:true,caldb:true,changes:true},
   mapping:{
     grade:["학년"], ban:["반"], no:["번호"], name:["이름","성명"],
     university:["대학명"], kind:["전형유형"], admission:["전형명(대)","전형명"],
-    detail:["세부유형"], track:["계열"], major:["모집단위","학과"],
+    detail:["세부유형","세부 전형명","전형명(세부)"], selection:["선발유형","선발 방식","전형방법"], track:["계열"], major:["모집단위","학과"],
     quota:["모집인원"], minimum:["최저학력기준","수능최저학력기준"],
     score:["내점수(환산)"], gpa:["내등급(환산)"],
     step1:["1단계"], final:["최종단계","최종"],
@@ -1267,12 +1275,12 @@ function adminTab(id){
   document.querySelectorAll(".setting-pane").forEach(p=>p.classList.toggle("on",p.id==="set_"+id));
 }
 function fieldLabel(k){
- const m={grade:"학년",ban:"반",no:"번호",name:"학생 이름",university:"대학",kind:"전형유형",admission:"전형명",detail:"세부유형",track:"계열",major:"모집단위",quota:"모집인원",minimum:"수능최저",score:"환산점수",gpa:"환산등급",step1:"1단계 결과",final:"최종 결과",fail:"불합격사유",register:"등록여부",interview:"면접일",practical:"실기일",essay:"논술일",aptitude:"적성일",announce1:"1단계 발표일",announce:"최종 발표일"};
+ const m={grade:"학년",ban:"반",no:"번호",name:"학생 이름",university:"대학",kind:"전형유형",admission:"전형명(대)",detail:"세부전형명",selection:"선발 방식",track:"계열",major:"모집단위",quota:"모집인원",minimum:"수능최저",score:"환산점수",gpa:"환산등급",step1:"1단계 결과",final:"최종 결과",fail:"불합격사유",register:"등록여부",interview:"면접일",practical:"실기일",essay:"논술일",aptitude:"적성일",announce1:"1단계 발표일",announce:"최종 발표일"};
  return m[k]||k;
 }
 function renderAdmin(){
  const mrows=Object.keys(CFG.mapping).map(k=>`<tr><td><b>${fieldLabel(k)}</b></td><td><input data-map="${k}" value="${esc((CFG.mapping[k]||[]).join(", "))}" placeholder="쉼표로 여러 열 이름 입력"></td></tr>`).join("");
- const menuRows=[["dash","대시보드"],["student","학생관리"],["univ","대학별 지원"],["minimum","수능최저"],["schedule","전형 일정"],["changes","변경 이력"]]
+ const menuRows=[["dash","대시보드"],["student","학생관리"],["univ","대학별 지원"],["audit","전형 점검"],["minimum","수능최저"],["schedule","전형 일정"],["changes","변경 이력"]]
    .map(([k,n])=>`<label style="display:inline-flex;align-items:center;gap:7px;margin:7px 15px 7px 0"><input type=checkbox data-menu="${k}" ${CFG.menus[k]!==false?"checked":""}> ${n}</label>`).join("");
  $("#adminView").innerHTML=`
  <div class=pagehead><div><h2>관리자 설정</h2><p>소스코드를 수정하지 않고 학교·학년도·Excel 양식·상담 분류를 변경할 수 있습니다.</p></div></div>
@@ -1332,7 +1340,11 @@ function collectBasic(){
  CFG.appTitle=$("#set_appTitle").value.trim()||"진학ON";
  CFG.appSubtitle=$("#set_appSubtitle").value.trim();
  CFG.schoolName=$("#set_schoolName").value.trim();
- CFG.schoolYear=Number($("#set_schoolYear").value)||new Date().getFullYear()+1;
+ const nextYear=Number($("#set_schoolYear").value)||new Date().getFullYear()+1;
+ if(CFG.schoolYear!==nextYear && S.rows.length){
+   if(!confirm(`학년도를 ${nextYear}학년도로 변경하시겠습니까?\n\n기존 자료를 먼저 백업하세요. 변경 후 새 학년도 대교협 엑셀과 발표일 대조표를 다시 불러와야 합니다.`))return;
+ }
+ CFG.schoolYear=nextYear;
  CFG.introTitle=$("#set_introTitle").value.trim();
  CFG.introGuide=$("#set_introGuide").value.trim();
  CFG.privacyText=$("#set_privacyText").value.trim();
@@ -1432,7 +1444,7 @@ async function ingestConfigured(matrix,label){
  const rows=[];
  for(let i=hi+1;i<matrix.length;i++){
   const a=matrix[i]||[];if(!configuredGet(a,H,"name"))continue;
-  const r={};for(const k of Object.keys(CFG.mapping))r[k]=configuredGet(a,H,k);rows.push(r);
+  const r={};for(const k of Object.keys(CFG.mapping))r[k]=configuredGet(a,H,k);r.schoolYear=String(CFG.schoolYear);rows.push(r);
  }
  if(!rows.length)throw Error("지원 자료를 찾지 못했습니다. Excel 열 매핑을 확인하세요.");
  const old=S.rows;S.oldRows=old;S.rows=rows;S.file=label;compare(old,rows);buildStudents();saveSession();openApp();jumpCalendarToData();render();
@@ -1454,7 +1466,7 @@ renderAdmin();
 // v6 presentation layer — no source borrowing from reference app
 // =========================================================
 const NAV_LABELS={
-  dash:"대시보드",student:"학생관리",univ:"대학별 지원",
+  dash:"대시보드",student:"학생관리",univ:"대학별 지원",audit:"전형 점검",
   minimum:"수능최저",schedule:"전형 일정",caldb:"합격발표 DB",changes:"변경 이력",admin:"관리자 설정"
 };
 function polishNav(){
@@ -1570,7 +1582,7 @@ const _showUnivV6=showUniv;
 showUniv=function(u){
   const rs=S.rows.filter(r=>r.university===u);
   setSheet(u,`<div style="display:flex;gap:8px;margin-bottom:16px"><span class=badge>${rs.length}건 지원</span><span class=badge>${new Set(rs.map(studentKey)).size}명</span></div>
-  <table><thead><tr><th>학생</th><th>모집단위</th><th>전형</th><th>결과</th></tr></thead><tbody>${rs.map(r=>`<tr><td>${r.ban}반 ${r.no}번 <span class=pname>${esc(r.name)}</span></td><td><b>${esc(r.major)}</b></td><td>${esc(r.admission||r.kind)}</td><td>${esc(resultText(r)||"미입력")}</td></tr>`).join("")}</tbody></table>`);
+  <table><thead><tr><th>학생</th><th>모집단위</th><th>전형</th><th>결과</th></tr></thead><tbody>${rs.map(r=>`<tr><td>${r.ban}반 ${r.no}번 <span class=pname>${esc(r.name)}</span></td><td><b>${esc(r.major)}</b></td><td>${esc(exactAdmission(r))}</td><td>${esc(resultText(r)||"미입력")}</td></tr>`).join("")}</tbody></table>`);
   setTimeout(()=>{tagStudentNames();applyBlindLabels()},0)
 };
 
@@ -1946,7 +1958,7 @@ renderMinimum=function(){
  <button class=secondary onclick="openMockEditor('6월')">6월 성적</button><button class=secondary onclick="openMockEditor('9월')">9월 성적</button></div>
  <div class=card><table><thead><tr><th>학생</th><th>대학</th><th>모집단위</th><th>전형</th><th>모평</th><th>판정</th><th>최저 원문</th></tr></thead><tbody>${a.map(r=>{
    const st=S.students.find(s=>s.key===studentKey(r)),lm=latestMock(st?.key||studentKey(r)),ev=evaluateMinimum(r,lm.data);
-   return `<tr><td class=pname>${r.ban}반 ${r.no}번 ${esc(r.name)}</td><td><b>${esc(r.university)}</b></td><td>${esc(r.major)}</td><td>${esc(r.admission||r.kind)}</td>
+   return `<tr><td class=pname>${r.ban}반 ${r.no}번 ${esc(r.name)}</td><td><b>${esc(r.university)}</b></td><td>${esc(r.major)}</td><td>${esc(exactAdmission(r))}</td>
    <td>${lm.exam?`<span class=badge>${lm.exam}</span>`:'<span style="color:var(--muted)">미입력</span>'}</td><td>${minBadge(ev)}${ev.detail?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${esc(ev.detail)}</div>`:""}</td>
    <td style="max-width:520px;white-space:normal;line-height:1.55">${esc(r.minimum)}</td></tr>`}).join("")||'<tr><td colspan=7>수능최저가 기재된 지원자료가 없습니다.</td></tr>'}</tbody></table></div>`;
  setTimeout(()=>{tagStudentNames();applyBlindLabels()},0);
@@ -3062,7 +3074,7 @@ renderMinimum=function(){
         <thead><tr><th>학생</th><th>대학</th><th>모집단위</th><th>시험</th><th>모평 등급</th><th>판정</th><th>최저 원문</th></tr></thead>
         <tbody>
           ${rows.map(x=>{
-            const searchText=[x.r.name,x.r.university,x.r.major,x.r.admission||x.r.kind||""].join(" ").toLowerCase();
+            const searchText=[x.r.name,x.r.university,x.r.major,exactAdmission(x.r)].join(" ").toLowerCase();
             return `<tr data-minsearch="${esc(searchText)}">
               <td class=pname>${x.r.ban}반 ${x.r.no}번 ${esc(x.r.name)}</td>
               <td><b>${esc(x.r.university)}</b></td>
@@ -3174,7 +3186,8 @@ saveSession=function(){
     file:S.file,
     savedAt:new Date().toISOString()
   };
-  localStorage.setItem(KEY,JSON.stringify(merged));
+  jFixMigrateState();
+  localStorage.setItem(KEY,JSON.stringify({...loadLocal(),...merged}));
 };
 
 // PDF 저장 함수: 작업 저장소 + 독립 성적 라이브러리에 동시에 보관.
@@ -3353,7 +3366,7 @@ function showMinimumRule(rowIndex){
 
     <dl class=rule-detail-grid>
       <dt>모집단위</dt><dd>${esc(r.major)}</dd>
-      <dt>전형</dt><dd>${esc(r.admission||r.kind||"")}</dd>
+      <dt>전형</dt><dd>${esc(exactAdmission(r))}</dd>
       <dt>모평 등급</dt><dd>${esc(scoreLine(sm.data))}</dd>
       ${sm.data.mathSel?`<dt>선택과목</dt><dd>${esc(sm.data.mathSel)} · ${esc([sm.data.inqSel1,sm.data.inqSel2].filter(Boolean).join(" / "))}</dd>`:""}
       <dt>자동판정</dt><dd><b>${esc(ev.status)}</b>${ev.detail?`<br><span style="color:var(--muted)">${esc(ev.detail)}</span>`:""}</dd>
@@ -3419,7 +3432,7 @@ renderMinimum=function(){
         </thead>
         <tbody>
           ${rows.map(x=>{
-            const searchText=[x.r.name,x.r.university,x.r.major,x.r.admission||x.r.kind||""].join(" ").toLowerCase();
+            const searchText=[x.r.name,x.r.university,x.r.major,exactAdmission(x.r)].join(" ").toLowerCase();
             return `<tr data-minsearch="${esc(searchText)}">
               <td class=student-cell title="${esc(x.r.name)}">${x.r.ban}반 ${x.r.no}번 ${esc(x.r.name)}</td>
               <td class=univ-cell title="${esc(x.r.university)}">${esc(x.r.university)}</td>
@@ -3462,7 +3475,8 @@ function scheduleGroupKey(r){
     String(r.university||"").trim(),
     String(r.kind||"").trim(),
     String(r.admission||"").trim(),
-    String(r.detail||"").trim()
+    String(r.detail||"").trim(),
+    String(r.selection||"").trim()
   ].join("¦");
 }
 function normalizedScheduleRaw(v){
@@ -3589,8 +3603,8 @@ function jcalRender(){
    <div class="jcal-flex"><strong>발표일 기준 자료: ${Number(CFG.schoolYear)}학년도</strong><span class="badge">전체 대학명 표시 · 생략 없음</span><span class="badge">전형 매칭 ${n.source}/${S.rows.length}건</span></div>
    <div class="jcal-stats"><div class="jcal-stat"><small>지원 건수</small><b>${S.rows.length}</b></div><div class="jcal-stat"><small>1단계 날짜 확인 건</small><b>${n.step}</b></div><div class="jcal-stat"><small>최종 날짜 확인 건</small><b>${n.final}</b></div><div class="jcal-stat"><small>발표 일정 날짜</small><b>${allDays.length}</b></div></div>
    <div class="jcal-warning">발표일 미확인: ${d.missing.length}건 (1단계 ${d.missing.filter(x=>x.kind==='1단계').length}건, 최종 ${d.missing.filter(x=>x.kind==='최종').length}건). 날짜를 확인한 지원 건만 DB에 반영합니다. 대학이 발표일을 변경할 수 있으므로 입학처 공지를 확인하세요.</div>
-   <div class="jcal-actions"><label class="jcal-file">발표일 대조표 갱신 (.xlsx)<input type="file" accept=".xlsx" onchange="jcalImportMaster(this.files[0])"></label><label class="jcal-file">원본 calendar.db 선택<input type="file" accept=".db" onchange="jcalSetDb(this.files[0])"></label><button type="button" class="primary" onclick="jcalExportDb()">CalendarTask DB 생성</button><button type="button" class="secondary" onclick="jcalExportMissing()">미확인 항목 CSV</button></div>
-   <p class="jcal-note">현재 선택한 DB: <b>${esc(jcalFile?.name||'선택 안 됨')}</b> · 기본 발표일 대조 자료는 2027학년도 기준입니다. 다른 학년도에는 새 대조표를 불러오세요. 설치판은 SQLite 변환 엔진을 포함하므로 DB 생성에 인터넷이 필요하지 않습니다. 학생 지원 내역과 DB는 외부 서버로 전송하지 않습니다.</p>
+   <div class="jcal-actions"><label class="jcal-file">발표일 대조표 갱신 (.xlsx·.csv)<input type="file" accept=".xlsx,.csv" onchange="jcalImportMaster(this.files[0])"></label><button type="button" class="secondary" onclick="jFixDownloadTemplate()">연도별 대조표 양식</button><label class="jcal-file">원본 calendar.db 선택<input type="file" accept=".db" onchange="jcalSetDb(this.files[0])"></label><button type="button" class="primary" onclick="jcalExportDb()">CalendarTask DB 생성</button><button type="button" class="secondary" onclick="jcalExportMissing()">미확인 항목 CSV</button></div>
+   <p class="jcal-note">현재 선택한 DB: <b>${esc(jcalFile?.name||'선택 안 됨')}</b> · 기본 발표일 대조 자료는 2027학년도 기준입니다. 다른 학년도에는 입학처 발표일을 확인하여 새 대조표를 불러오세요. 설치판은 SQLite 변환 엔진을 포함하므로 DB 생성에 인터넷이 필요하지 않습니다. 학생 지원 내역과 DB는 외부 서버로 전송하지 않습니다.</p>
    <div class="jcal-guide">
      <p class="jcal-guide-title">바탕화면 달력(CalendarTask) 설치 및 DB 적용 안내</p>
      <p class="jcal-note">달력이 아직 없다면 <a href="https://www.xdiarys.com/?lang=kor" target="_blank" rel="noopener noreferrer">CalendarTask 공식 홈페이지(한국어)</a>에서 <b>Windows 버전</b>을 설치하세요.</p>
@@ -3614,13 +3628,15 @@ function jcalSetDb(file){
 async function jcalImportMaster(file){
  if(!file)return;
  try{
-  const matrix=await readXlsx(file);
+  const matrix=await jFixReadTabular(file);
   const hidx=matrix.findIndex(r=>r.includes('지원 대학')&&r.includes('전형명')&&r.includes('1단계 발표일')&&r.includes('최종 발표일'));
   if(hidx<0)throw Error('대조표의 필수 열(지원 대학·전형명·모집단위·발표일)을 찾지 못했습니다.');
   const H=Object.fromEntries(matrix[hidx].map((x,i)=>[String(x||'').trim(),i]));
   const next=new Map();
   for(const row of matrix.slice(hidx+1)){
    const v=x=>String(row[H[x]]||'').trim();const u=v('지원 대학'),de=v('전형명'),major=v('모집단위');
+   const rowYear=v('학년도');
+   if(rowYear && Number(rowYear)!==Number(CFG.schoolYear))throw Error(`학년도 불일치: ${rowYear}학년도 자료입니다. 현재 설정은 ${CFG.schoolYear}학년도입니다.`);
    if(!u||!major)continue;
    const k=jcalKey(u,de,major),s=jcalDate(v('1단계 발표일')),f=jcalDate(v('최종 발표일'));
    if(!next.has(k))next.set(k,[u,de,major,s,f,v('선발 방식')]);
@@ -3724,6 +3740,158 @@ async function jcalExportDb(){
 const _jcalOriginalRender=render;
 render=function(){_jcalOriginalRender();jcalRender()};
 jcalRender();
+
+
+// =========================================================
+// 진학ON v1.0.6 — 세부전형 구분·안전한 자료 이전·학년도별 자료
+// =========================================================
+function jFixLegacyGroups(){
+ const groups=new Map();
+ for(const r of S.rows){
+   const legacy=legacyAppKey(r),newKey=appKey(r);
+   if(!groups.has(legacy))groups.set(legacy,new Map());
+   groups.get(legacy).set(newKey,r);
+ }
+ return groups;
+}
+function jFixMigrateState(){
+ if(!S.rows.length)return;
+ const d=loadLocal();
+ d.results=d.results||{};d.stages=d.stages||{};
+ d.migrationDecisions=d.migrationDecisions||{};
+ d.migrationReview=d.migrationReview||{};
+ for(const [legacy,candidates] of jFixLegacyGroups()){
+   const hasResult=Object.prototype.hasOwnProperty.call(d.results,legacy);
+   const hasStages=Object.prototype.hasOwnProperty.call(d.stages,legacy);
+   if(!hasResult&&!hasStages)continue;
+   if(d.migrationDecisions[legacy]){delete d.migrationReview[legacy];continue;}
+   if(candidates.size===1){
+     const target=[...candidates.keys()][0];
+     if(hasResult && !Object.prototype.hasOwnProperty.call(d.results,target))d.results[target]=d.results[legacy];
+     if(hasStages){
+       d.stages[target]=d.stages[target]||{};
+       for(const [field,value] of Object.entries(d.stages[legacy]||{})){
+         if(!Object.prototype.hasOwnProperty.call(d.stages[target],field))d.stages[target][field]=value;
+       }
+     }
+     d.migrationDecisions[legacy]=target;
+     delete d.migrationReview[legacy];
+   }else{
+     d.migrationReview[legacy]={
+       year:CFG.schoolYear,
+       result:hasResult?d.results[legacy]:"",
+       stages:hasStages?d.stages[legacy]:{},
+       candidates:[...candidates.keys()]
+     };
+   }
+ }
+ // 구버전 키는 안전을 위해 삭제하지 않습니다.
+ localStorage.setItem(KEY,JSON.stringify(d));
+}
+function jFixApplyLegacy(legacy,target){
+ const d=loadLocal();
+ const entry=d.migrationReview?.[legacy];
+ if(!entry||!(entry.candidates||[]).includes(target))return;
+ const row=S.rows.find(r=>appKey(r)===target);
+ if(!row)return;
+ const chosen=`${row.university} / ${exactAdmission(row)} / ${row.major}`;
+ if(!confirm(`기존 결과 기록을 다음 지원 전형으로 옮길까요?\n\n${chosen}\n\n다른 전형의 결과는 추정해서 입력하지 않습니다.`))return;
+ d.results=d.results||{};d.stages=d.stages||{};
+ if(entry.result && !d.results[target])d.results[target]=entry.result;
+ d.stages[target]=d.stages[target]||{};
+ for(const [k,v] of Object.entries(entry.stages||{})){
+  if(!d.stages[target][k])d.stages[target][k]=v;
+ }
+ d.migrationDecisions=d.migrationDecisions||{};d.migrationDecisions[legacy]=target;
+ delete d.migrationReview[legacy];
+ localStorage.setItem(KEY,JSON.stringify(d));
+ render();toast('기존 결과를 선택한 전형으로 연결했습니다.','good');
+}
+function jFixAuditData(){
+ const legacyGroups=jFixLegacyGroups();
+ const pending=loadLocal().migrationReview||{};
+ const groupCollisions=[...legacyGroups].filter(([,rows])=>rows.size>1);
+ const detailMissing=S.rows.filter(r=>!jFixNorm(r.detail));
+ const selectionMissing=S.rows.filter(r=>!jFixNorm(r.selection));
+ const exactDup=new Map();for(const r of S.rows){const k=appKey(r);exactDup.set(k,(exactDup.get(k)||0)+1)}
+ const duplicates=[...exactDup].filter(([,cnt])=>cnt>1);
+ return {pending,groupCollisions,detailMissing,selectionMissing,duplicates};
+}
+function jFixRenderAudit(){
+ const el=$('#auditView');if(!el)return;
+ const a=jFixAuditData(),pending=Object.entries(a.pending);
+ const rows=pending.map(([key,entry])=>{
+  const original=S.rows.find(r=>legacyAppKey(r)===key);
+  if(!original)return '';
+  return `<div class="card" style="margin-top:12px">
+    <h3>${esc(original.ban)}반 ${esc(original.no)}번 ${esc(original.name)} · ${esc(original.university)} · ${esc(original.major)}</h3>
+    <p style="color:var(--muted);font-size:12px">기존 입력: ${esc(entry.result||'')} ${esc(Object.entries(entry.stages||{}).map(([k,v])=>`${k}: ${v}`).join(' / '))}</p>
+    <p style="color:var(--muted);font-size:12px">해당 결과가 속하는 전형을 직접 선택하세요.</p>
+    <div class="jcal-flex">${(entry.candidates||[]).map(target=>{
+      const r=S.rows.find(x=>appKey(x)===target);
+      if(!r)return '';
+      const index=S.rows.indexOf(r);
+      return `<button class="secondary" onclick="jFixChooseByIndex(${index})">${esc(exactAdmission(r))}</button>`;
+    }).join('')}</div>
+  </div>`;
+ }).join('');
+ el.innerHTML=`
+ <div class="pagehead"><div><h2>전형 점검</h2><p>대교협 엑셀의 세부유형을 기준으로 지원 건을 구분합니다. 원본 전형명은 변경하지 않습니다.</p></div></div>
+ <div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px">
+ <div class="kpi"><small>지원 건수</small><b>${S.rows.length}</b></div>
+ <div class="kpi"><small>구버전 키 중복</small><b>${a.groupCollisions.length}</b></div>
+ <div class="kpi"><small>이전 자료 확인</small><b>${pending.length}</b></div>
+ <div class="kpi"><small>세부유형 미입력</small><b>${a.detailMissing.length}</b></div></div>
+ <div class="card"><h3>엑셀 확인 결과</h3>
+ <p style="font-size:13px;line-height:1.8">구버전 키로 구분할 수 없던 전형 ${a.groupCollisions.length}그룹은 이제 서로 다른 지원 건으로 관리합니다. 선발유형 누락 ${a.selectionMissing.length}건, 완전히 동일한 지원 건의 중복 ${a.duplicates.length}그룹입니다.</p>
+ <p style="font-size:12px;color:var(--muted);line-height:1.7">구버전에서 같은 키로 저장된 결과가 있다면 자동으로 어느 전형인지 결정하지 않습니다. 학생별 원서 확인 후 연결하세요. 대교협 파일 자체의 정보가 빠진 경우에는 대학 입학처 전형명을 확인해야 합니다.</p>
+ </div>
+ <div class="card" style="margin-top:12px"><h3>기존 결과 이전 확인 · ${pending.length}건</h3>${rows||'<p style="color:var(--muted);font-size:13px">확인해야 할 기존 결과가 없습니다.</p>'}</div>
+ <div class="card" style="margin-top:12px"><h3>다음 학년도 준비</h3>
+ <p style="font-size:13px;line-height:1.8">① 기존 자료 백업 → ② 관리자 설정에서 대입 학년도 변경 → ③ 새 대교협 수시진학관리 Excel 불러오기 → ④ 대학 입학처 발표일 대조표 갱신 → ⑤ CalendarTask DB 생성</p>
+ <p style="font-size:12px;color:var(--muted)">모집요강과 발표일은 해마다 확인해야 하지만 프로그램 설치는 보통 그대로 사용할 수 있습니다. Excel 열 이름이 바뀌면 관리자 설정에서 추가할 수 있습니다.</p>
+ </div>`;
+}
+function jFixChooseByIndex(index){
+ const r=S.rows[index];if(!r)return;
+ jFixApplyLegacy(legacyAppKey(r),appKey(r));
+}
+// CSV도 발표일 양식으로 쓸 수 있도록 지원합니다.
+function jFixParseCsv(t){
+ const src=String(t||'').replace(/^\uFEFF/,''),out=[];
+ let row=[],field='',quote=false;
+ for(let i=0;i<src.length;i++){
+  const c=src[i];
+  if(c==='"'){
+    if(quote&&src[i+1]==='"'){field+='"';i++}else quote=!quote;
+  }else if(c===','&&!quote){row.push(field);field=''}
+  else if((c==='\n'||c==='\r')&&!quote){
+    if(c==='\r'&&src[i+1]==='\n')i++;
+    row.push(field);if(row.some(x=>x.trim()))out.push(row);row=[];field='';
+  }else field+=c;
+ }
+ if(quote)throw Error('CSV 따옴표가 닫히지 않았습니다.');
+ row.push(field);if(row.some(x=>x.trim()))out.push(row);
+ return out;
+}
+async function jFixReadTabular(file){
+ return /\.csv$/i.test(file.name)?jFixParseCsv(await file.text()):await readXlsx(file);
+}
+function jFixDownloadTemplate(){
+ const content='\ufeff학년도,지원 대학,전형명,모집단위,선발 방식,1단계 발표일,최종 발표일\r\n';
+ const blob=new Blob([content],{type:'text/csv;charset=utf-8'});
+ jcalDownload(blob,`진학ON_${CFG.schoolYear}학년도_발표일입력양식.csv`);
+}
+const _jFixPriorRender=render;
+render=function(){_jFixPriorRender();jFixRenderAudit()};
+const _jFixPriorLogin=loginVault;
+loginVault=async function(){
+ await _jFixPriorLogin();
+ if(S.rows.length){jFixMigrateState();render()}
+};
+if($('#loginBtn'))$('#loginBtn').onclick=loginVault;
+// 백업 복원은 원본 함수에서 마이그레이션을 실행하도록 보강했습니다.
+render();
 
 </script>
 </body></html>
