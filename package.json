@@ -1,0 +1,46 @@
+{
+  "name": "jinhakon-desktop",
+  "private": true,
+  "version": "1.0.4",
+  "description": "지산고 진학ON 설치판 및 CalendarTask 발표일 DB 생성",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "prepare:vendor": "node scripts/copy-vendor.cjs",
+    "start": "npm run prepare:vendor && electron .",
+    "dist:win": "npm run prepare:vendor && electron-builder --win nsis --x64 --publish never"
+  },
+  "dependencies": {
+    "sql.js": "1.13.0"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "kr.jisanhigh.jinhakon",
+    "productName": "진학ON",
+    "artifactName": "JinhakON_Setup_${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app/index.html",
+      "app/vendor/sql-asm.js",
+      "electron/main.cjs",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
