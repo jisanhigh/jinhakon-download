@@ -1,11 +1,11 @@
-name: Build Windows installer
+name: Build original JinhakON updater (Go / Edge)
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - 'app/**'
-      - 'electron/**'
+      - 'app/index.html'
+      - 'legacy/**'
       - 'scripts/**'
       - 'package.json'
       - '.github/workflows/build-windows.yml'
@@ -20,20 +20,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Install offline SQLite runtime
         run: npm install --no-audit --no-fund
-      - name: Verify bundled SQLite source
+      - name: Bundle HTML and SQLite in original launcher
+        shell: pwsh
         run: |
           npm run prepare:vendor
-          node --check electron/main.cjs
-          node -e "const fs=require('fs');if(fs.statSync('app/vendor/sql-asm.js').size<100000)process.exit(1)"
-      - name: Build installer
-        run: npm run dist:win
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Upload unsigned installer for testing
-        uses: actions/upload-artifact@v4
+          New-Item -ItemType Directory -Force -Path legacy/launcher/vendor | Out-Null
+          Copy-Item app/index.html legacy/launcher/index.html -Force
+          Copy-Item app/vendor/sql-asm.js legacy/launcher/vendor/sql-asm.js -Force
+      - name: Compile original launcher and in-place installer
+        shell: pwsh
+        run: |
+          Push-Location legacy/launcher
+          go build -trimpath -ldflags '-H windowsgui -s -w' -o JinhakON.exe .
+          Pop-Location
+          Copy-Item legacy/launcher/JinhakON.exe legacy/installer/JinhakON.exe -Force
+          Push-Location legacy/installer
+          go build -trimpath -ldflags '-H windowsgui -s -w' -o JinhakON_Setup_1.0.5_OriginalUpdate.exe .
+          Pop-Location
+      - name: Verify installer and include instructions
+        shell: pwsh
+        run: |
+          if ((Get-Item legacy/installer/JinhakON_Setup_1.0.5_OriginalUpdate.exe).Length -lt 5000000) { throw 'Unexpected installer size' }
+          Copy-Item docs/ORIGINAL_UPDATE.md legacy/installer/ORIGINAL_UPDATE_README.md -Force
+      - uses: actions/upload-artifact@v4
         with:
-          name: JinhakON_Setup_1.0.4_TEST
-          path: dist/JinhakON_Setup_1.0.4.exe
+          name: JinhakON_Setup_1.0.5_OriginalUpdate
+          path: |
+            legacy/installer/JinhakON_Setup_1.0.5_OriginalUpdate.exe
+            legacy/installer/ORIGINAL_UPDATE_README.md
           if-no-files-found: error
