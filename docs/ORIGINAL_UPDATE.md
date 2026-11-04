@@ -1,6 +1,6 @@
-# 진학ON v1.0.5 기존 설치판 덮어쓰기 업데이트
+# 진학ON v1.0.5 정식 배포판 — 기존 설치 덮어쓰기 업데이트
 
-이번 업데이트는 **기존 Go/Edge 방식의 진학ON을 그대로 교체**하며, 별도의 Electron 앱을 설치하지 않습니다.
+v1.0.5 정식 설치판은 **기존 Go/Edge 방식의 진학ON을 그대로 교체**하며, 별도의 Electron 앱을 설치하지 않습니다.
 
 - 설치 파일: `%LOCALAPPDATA%\Programs\JinhakON\JinhakON.exe` (기존과 동일)
 - 사용자 데이터: `%LOCALAPPDATA%\JinhakON\EdgeProfile` (삭제하지 않음)
