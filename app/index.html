@@ -707,7 +707,6 @@ tbody tr:last-child td{border-bottom:0!important}
    <button class="navbtn on" data-view="dash">▦ 대시보드</button>
    <button class="navbtn" data-view="student">👤 학생관리</button>
    <button class="navbtn" data-view="univ">▥ 대학별 지원</button>
-   <button class="navbtn" data-view="audit">전형 점검</button>
    <button class="navbtn" data-view="minimum">◎ 수능최저</button>
    <button class="navbtn" data-view="schedule">◷ 전형 일정</button>
    <button class="navbtn" data-view="caldb">▣ 합격발표 DB</button>
@@ -1204,7 +1203,7 @@ const db=$("#demoBtn");if(db)db.remove();
 
 
 // ===== 진학ON v5 관리자 설정 / 유지보수 =====
-const APP_VERSION="1.0.6";
+const APP_VERSION="1.0.7";
 const SETTINGS_KEY="jinhakON.settings.v5";
 
 const DEFAULT_SETTINGS={
@@ -1218,7 +1217,7 @@ const DEFAULT_SETTINGS={
   counselingCategories:["수시전략","지원결정","수능최저","면접·논술","정시전략","학부모상담","기타"],
   resultStates:["합격","불합격","충원합격","예비","등록"],
   eventTypes:["면접","실기","논술","적성","1단계 발표","최종발표","상담","기타"],
-  menus:{dash:true,student:true,univ:true,audit:true,minimum:true,schedule:true,caldb:true,changes:true},
+  menus:{dash:true,student:true,univ:true,minimum:true,schedule:true,caldb:true,changes:true},
   mapping:{
     grade:["학년"], ban:["반"], no:["번호"], name:["이름","성명"],
     university:["대학명"], kind:["전형유형"], admission:["전형명(대)","전형명"],
@@ -1280,7 +1279,7 @@ function fieldLabel(k){
 }
 function renderAdmin(){
  const mrows=Object.keys(CFG.mapping).map(k=>`<tr><td><b>${fieldLabel(k)}</b></td><td><input data-map="${k}" value="${esc((CFG.mapping[k]||[]).join(", "))}" placeholder="쉼표로 여러 열 이름 입력"></td></tr>`).join("");
- const menuRows=[["dash","대시보드"],["student","학생관리"],["univ","대학별 지원"],["audit","전형 점검"],["minimum","수능최저"],["schedule","전형 일정"],["changes","변경 이력"]]
+ const menuRows=[["dash","대시보드"],["student","학생관리"],["univ","대학별 지원"],["minimum","수능최저"],["schedule","전형 일정"],["changes","변경 이력"]]
    .map(([k,n])=>`<label style="display:inline-flex;align-items:center;gap:7px;margin:7px 15px 7px 0"><input type=checkbox data-menu="${k}" ${CFG.menus[k]!==false?"checked":""}> ${n}</label>`).join("");
  $("#adminView").innerHTML=`
  <div class=pagehead><div><h2>관리자 설정</h2><p>소스코드를 수정하지 않고 학교·학년도·Excel 양식·상담 분류를 변경할 수 있습니다.</p></div></div>
@@ -1331,7 +1330,7 @@ function renderAdmin(){
      <div class=versionbox><div><small>프로그램 버전</small><b>${APP_VERSION}</b></div><div><small>저장 방식</small><b>브라우저 로컬 저장</b></div><div><small>데이터 처리</small><b>PC 내부 처리</b></div></div>
      <div class=helpbox style="margin-top:16px">설정 파일을 내보내면 다른 학교 PC에서도 동일한 메뉴·열 매핑·업무 분류를 바로 적용할 수 있습니다. 프로그램 소스 수정이 필요한 경우에는 HTML/CSS/JavaScript 영역이 기능별로 구분되어 있습니다.</div>
     </div>
-    <div class=setting-actions><button class=primary onclick=exportSettings()>설정 내보내기</button><button class=secondary onclick=importSettings()>설정 가져오기</button><button class=secondary onclick=downloadMaintenanceGuide()>유지보수 안내 저장</button></div>
+    <div class=setting-actions><button class=primary onclick=exportSettings()>설정 내보내기</button><button class=secondary onclick=importSettings()>설정 가져오기</button><button class=secondary onclick=downloadMaintenanceGuide()>유지보수 안내 저장</button><button class=secondary onclick="switchView('audit')">전형 자료 확인</button></div>
    </div>
   </div>
  </div>`;
@@ -3836,7 +3835,7 @@ function jFixRenderAudit(){
   </div>`;
  }).join('');
  el.innerHTML=`
- <div class="pagehead"><div><h2>전형 점검</h2><p>대교협 엑셀의 세부유형을 기준으로 지원 건을 구분합니다. 원본 전형명은 변경하지 않습니다.</p></div></div>
+ <div class="pagehead"><div><h2>전형 자료 확인</h2><p>대교협 엑셀의 세부유형을 기준으로 지원 건을 구분합니다. 원본 전형명은 변경하지 않습니다.</p></div><button class="secondary" onclick="switchView('admin');adminTab('maint')">관리자 설정으로 돌아가기</button></div>
  <div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px">
  <div class="kpi"><small>지원 건수</small><b>${S.rows.length}</b></div>
  <div class="kpi"><small>구버전 키 중복</small><b>${a.groupCollisions.length}</b></div>
