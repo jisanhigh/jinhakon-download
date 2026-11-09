@@ -1013,6 +1013,24 @@ function openScheduleDate(date){
  renderSchedule();
 }
 
+function scheduleUpcomingHtml(events,today){
+ const last=scheduleDatePlusDays(today,13);
+ const items=events.filter(e=>e.date>=today&&e.date<=last);
+ const shown=items.slice(0,12);
+ let html='<div class="card" style="margin-top:14px"><h3>오늘부터 2주간 일정 <span class="badge">'+items.length+'건</span></h3>';
+ if(!shown.length)return html+'<p style="color:var(--muted)">앞으로 2주간 등록된 일정이 없습니다.</p></div>';
+ const rows=shown.map(e=>{
+  const detail=e.row
+    ? e.row.ban+'반 '+e.row.no+'번 '+e.row.name+' · '+e.row.university+' · '+e.row.major
+    : e.title;
+  return '<tr><td><button class="secondary" style="padding:5px 9px" onclick="openScheduleDate(&quot;'+e.date+'&quot;)">'+esc(e.date)+'</button></td>'+
+    '<td>'+esc(e.type)+'</td><td>'+esc(detail)+'</td></tr>';
+ }).join('');
+ html+='<div style="overflow-x:auto"><table><thead><tr><th>날짜</th><th>구분</th><th>학생·대학·내용</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+ if(items.length>shown.length)html+='<p style="font-size:12px;color:var(--muted);margin-top:9px">나머지 '+(items.length-shown.length)+'건은 달력에서 날짜를 선택해 확인할 수 있습니다.</p>';
+ return html+'</div>';
+}
+
 function addManualEvent(){
  const d=S.selectedDay||prompt("날짜를 YYYY-MM-DD 형식으로 입력하세요.");if(!d)return;
  const title=prompt(`${d}에 추가할 일정/메모를 입력하세요.`);if(!title)return;
@@ -1054,6 +1072,7 @@ renderSchedule=function(){
    </div>
    <div class=calendar>${["일","월","화","수","목","금","토"].map((x,i)=>`<div class="dow ${i===0?"sun":i===6?"sat":""}">${x}</div>`).join("")}${cells}</div>
  </div>
+ ${scheduleUpcomingHtml(ev,today)}
  <div class=card style="margin-top:14px"><h3>${sel} 일정</h3>${dayEv.length?`<table><thead><tr><th>구분</th><th>학생/대학/내용</th><th></th></tr></thead><tbody>${dayEv.map(x=>`<tr><td><span class="badge ${x.cls==="announce"?"good":x.cls==="essay"?"bad":"warn"}" style="${x.cls==="practical"?"background:#f1e9ff;color:#6841a5":x.cls==="aptitude"?"background:#e8f2ff;color:#2e5f9b":""}">${esc(x.type)}</span></td><td>${x.row?`${x.row.ban}반 ${x.row.no}번 <span class=pname>${esc(x.row.name)}</span> · ${esc(x.row.university)} · ${esc(x.row.major)}`:esc(x.title)}</td><td>${x.manual!=null?`<button class=secondary onclick=deleteManual(${x.manual})>삭제</button>`:""}</td></tr>`).join("")}</tbody></table>`:"<p style='color:var(--muted)'>등록된 일정이 없습니다.</p>"}</div>`;
 }
 
