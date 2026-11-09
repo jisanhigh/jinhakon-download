@@ -4,7 +4,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const html=fs.readFileSync(path.join(__dirname,'..','app','index.html'),'utf8');
-assert(html.includes('const APP_VERSION="1.0.9"'));
+assert(/const APP_VERSION="1\.0\.\d+";/.test(html),'application version must be defined');
 const begin=html.indexOf('function matchPdfStudentForSave(rec){');
 const end=html.indexOf('\nfunction scoreLibrarySummary(){',begin);
 assert(begin>0&&end>begin);
