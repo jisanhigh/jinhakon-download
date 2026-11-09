@@ -1246,7 +1246,7 @@ const db=$("#demoBtn");if(db)db.remove();
 
 
 // ===== 진학ON v5 관리자 설정 / 유지보수 =====
-const APP_VERSION="1.0.10";
+const APP_VERSION="1.0.11";
 const SETTINGS_KEY="jinhakON.settings.v5";
 
 const DEFAULT_SETTINGS={
@@ -3504,19 +3504,29 @@ snapshot=function(){
   return x;
 };
 
-// 로그인 복원 시 성적 라이브러리도 함께 복원.
+// PIN 로그인은 등록 학생·상담 작업을 복원하되, 이후 추가된 모평·학평 성적을 지우지 않는다.
+// 성적 라이브러리는 독립 저장소를 우선하며, 처음 복원할 때만 암호화 백업을 사용한다.
 loginVault=async function(){
  const pw=normPw($("#loginPw").value);if(!pw)return;
  try{
    const pack=JSON.parse(localStorage.getItem(VAULT));let d;
    if(pack.mode==="gate"){if(simpleHash(pw)!==pack.hash)throw Error("bad password");d=pack.data;}
    else d=await decryptObj(pack,pw);
-   S.rows=d.rows||[];S.file=d.file||"저장된 작업";S.changes=d.changes||[];S.manualEvents=d.manualEvents||[];
-   if(d.localState)localStorage.setItem(KEY,JSON.stringify(d.localState));
-   else localStorage.setItem(KEY,JSON.stringify({notes:d.notes||{},changes:S.changes,manualEvents:S.manualEvents}));
-   if(d.scoreLibrary)writeScoreLibrary(d.scoreLibrary);
+   // 읽기/병합은 원본 상태를 변경하기 전에 수행한다.
+   const liveLocal=getLocalState();
+   const savedLocal=d.localState||{notes:d.notes||{},changes:d.changes||[],manualEvents:d.manualEvents||[]};
+   const libKey=scoreLibraryKey();
+   const libraryExists=localStorage.getItem(libKey)!==null;
+   const restoredLocal={...savedLocal,...liveLocal};
+   // 과거 PIN 저장본보다 이후 PDF 업로드·수동 보정 결과가 우선이다.
+   restoredLocal.mocks=mergeDeepMocks(savedLocal.mocks||{},liveLocal.mocks||{});
+   localStorage.setItem(KEY,JSON.stringify(restoredLocal));
+   // PIN 저장 당시의 성적 라이브러리가 최신 라이브러리를 덮어쓰지 않도록 한다.
+   if(!libraryExists && d.scoreLibrary)writeScoreLibrary(d.scoreLibrary);
+   S.rows=d.rows||[];S.file=d.file||"저장된 작업";S.changes=d.changes||[];
+   S.manualEvents=restoredLocal.manualEvents||d.manualEvents||[];
    buildStudents();openApp();jumpCalendarToData();render();
- }catch(e){toast("PIN/비밀번호가 다르거나 저장 데이터가 손상되었습니다.","bad")}
+ }catch(e){toast("PIN 로그인 또는 저장자료 복원에 실패했습니다: "+(e.message||e),"bad")}
 };
 if($("#loginBtn"))$("#loginBtn").onclick=loginVault;
 if($("#loginPw"))$("#loginPw").onkeydown=e=>{if(e.key==="Enter")loginVault()};
