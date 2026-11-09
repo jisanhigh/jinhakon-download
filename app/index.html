@@ -3518,8 +3518,12 @@ loginVault=async function(){
    const libKey=scoreLibraryKey();
    const libraryExists=localStorage.getItem(libKey)!==null;
    const restoredLocal={...savedLocal,...liveLocal};
-   // 과거 PIN 저장본보다 이후 PDF 업로드·수동 보정 결과가 우선이다.
-   restoredLocal.mocks=mergeDeepMocks(savedLocal.mocks||{},liveLocal.mocks||{});
+   // 별도 라이브러리가 이미 있으면 현재 라이브러리가 정본이다.
+   // 예전 PIN 백업의 성적을 가져와 삭제된 시험을 되살리지 않는다.
+   const currentMocks=libraryExists
+     ?mergeDeepMocks(liveLocal.mocks||{},readScoreLibrary().mocks||{})
+     :mergeDeepMocks(savedLocal.mocks||{},liveLocal.mocks||{});
+   restoredLocal.mocks=currentMocks;
    localStorage.setItem(KEY,JSON.stringify(restoredLocal));
    // PIN 저장 당시의 성적 라이브러리가 최신 라이브러리를 덮어쓰지 않도록 한다.
    if(!libraryExists && d.scoreLibrary)writeScoreLibrary(d.scoreLibrary);
