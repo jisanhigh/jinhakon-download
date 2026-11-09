@@ -10,16 +10,19 @@ const js=html.slice(begin+8,end);
 new vm.Script(js,{filename:'app/index.html'});
 const checks=[
  ['no sidebar audit', 'onclick="switchView(\'audit\')"'],
- ['version','const APP_VERSION="1.0.7"'],
+ ['version','const APP_VERSION="1.0.8"'],
  ['exact admission','function exactAdmission(r)'],
  ['unique application key','const appKey=r=>["JK2"'],
  ['legacy migration','function jFixMigrateState()'],
  ['manual review','function jFixRenderAudit()'],
  ['annual CSV','function jFixDownloadTemplate()'],
  ['selection mapping','selection:["선발유형"'],
- ['offline SQLite','./vendor/sql-asm.js']
+ ['offline SQLite','./vendor/sql-asm.js'],
+ ['school PDF class recognition','function reportClassNumber(page,fileName)'],
+ ['school PDF grade columns','function reportGradeColumns(page)'],
+ ['school PDF format parser','parseNationalPdf=function']
 ];
 for(const [name,needle] of checks){if(!html.includes(needle))throw Error('Missing '+name)}
 if (html.includes('class="navbtn" data-view="audit"')) throw Error('Audit must not be in sidebar');
 if (html.includes('["audit","전형 점검"]')) throw Error('Audit must not be a user-toggle menu');
-console.log('v1.0.7 source verified:',checks.map(x=>x[0]).join(', '));
+console.log('v1.0.8 source verified:',checks.map(x=>x[0]).join(', '));
