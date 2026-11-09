@@ -1203,7 +1203,7 @@ const db=$("#demoBtn");if(db)db.remove();
 
 
 // ===== 진학ON v5 관리자 설정 / 유지보수 =====
-const APP_VERSION="1.0.7";
+const APP_VERSION="1.0.8";
 const SETTINGS_KEY="jinhakON.settings.v5";
 
 const DEFAULT_SETTINGS={
@@ -2287,6 +2287,97 @@ async function parseScorePdf(file){
   if(!records.length)throw new Error("학생 성적 행을 찾지 못했습니다. 스캔 PDF가 아닌 성적일람표 원본 PDF인지 확인해 주세요.");
   return {file:file.name,exam,records};
 }
+// ===== 학급별 평가원/전국연합 성적일람표 양식 호환 =====
+// 표의 등급 열 위치와 학급 번호를 원본 PDF에서 읽으며, 수능최저 판정 규칙은 변경하지 않는다.
+function reportClassNumber(page,fileName){
+ const ls=pdfLines(page.items),top=ls.slice(0,9).map(l=>l.compact).join('');
+ let m=top.match(/(?:^|[^0-9])(\d{1,2})반(?:[^가-힣]|$)/);if(m)return Number(m[1]);
+ const k=ls.findIndex(l=>l.compact.includes('학년반학교명'));
+ if(k>=0){
+  const hx=ls[k].items.find(z=>z.text==='반')?.x;
+  if(hx!=null)for(const l of ls.slice(k+1,k+5)){
+   const v=l.items.find(z=>/^\d{1,2}$/.test(z.text)&&Math.abs(z.x-hx)<9);
+   if(v)return Number(v.text);
+  }
+ }
+ m=String(fileName||'').match(/(?:^|[^0-9])(\d{1,2})\s*반/);
+ return m?Number(m[1]):0;
+}
+function reportGradeColumns(page){
+ let best=[];
+ for(const l of pdfLines(page.items)){
+  const a=[],xs=l.items;
+  for(let i=0;i<xs.length;i++){
+   const t=String(xs[i].text||'').replace(/\s/g,'');
+   if(t==='등급'){a.push(xs[i].x);continue}
+   if(t!=='등')continue;
+   const next=xs.slice(i+1,i+5).find(z=>z.text==='급'&&z.x>xs[i].x&&z.x-xs[i].x<24);
+   if(next)a.push((xs[i].x+next.x)/2);
+  }
+  if(a.length>best.length)best=a;
+ }
+ return best.length>=6?best.slice(0,7):[];
+}
+const _legacyNationalPdf=parseNationalPdf;
+parseNationalPdf=function(pages,exam,fileName=''){
+ const out=[],names=[...new Set(S.students.map(s=>s.name))].sort((a,b)=>b.length-a.length);
+ for(const p of pages){
+  const cols=reportGradeColumns(p);
+  if(cols.length<6){out.push(..._legacyNationalPdf([p],exam));continue}
+  const ban=reportClassNumber(p,fileName),tol=Math.max(7,p.width*.012);
+  for(const l of pdfLines(p.items)){
+   const name=names.find(n=>l.compact.includes(n));if(!name)continue;
+   const x=l.items.find(z=>z.text===name[0])?.x;
+   const id=l.items.filter(z=>/^\d$/.test(z.text)&&x!=null&&z.x<x-4).map(z=>z.text).join('');
+   const no=Number(id)||Number(l.compact.match(/^(\d{1,2})/)?.[1])||0;
+   const vals=cols.map(cx=>{
+    const hits=l.items.filter(z=>/^[1-9]$/.test(z.text)&&Math.abs(z.x-cx)<tol)
+      .sort((a,b)=>Math.abs(a.x-cx)-Math.abs(b.x-cx));
+    return hits.length?Number(hits[0].text):0;
+   });
+   if(vals.slice(0,6).filter(Boolean).length<5)continue;
+   const sub=subjectsFromText(l.text);
+   out.push({name,ban,no,kor:vals[0],math:vals[1],eng:vals[2],hist:vals[3],inq1:vals[4],inq2:vals[5],
+    korSel:sub.kor,mathSel:sub.math,inqSel1:sub.inquiry[0]||'',inqSel2:sub.inquiry[1]||''});
+  }
+ }
+ return out;
+};
+// PDF 텍스트에 과목명이 여러 번 나타날 때 원문 왼쪽에서 오른쪽 순서대로 선택한다.
+subjectsFromText=function(text){
+ const n=normSubjectText(text),hits=[],occupied=[];
+ for(const s of [...SUBJECTS].sort((a,b)=>normSubjectText(b).length-normSubjectText(a).length)){
+  const t=normSubjectText(s);let at=n.indexOf(t);
+  while(at>=0){
+   if(!occupied.some(r=>at<r[1]&&at+t.length>r[0])){
+    occupied.push([at,at+t.length]);hits.push({s,at});
+   }
+   at=n.indexOf(t,at+1);
+  }
+ }
+ hits.sort((a,b)=>a.at-b.at);
+ const a=hits.map(z=>z.s);
+ return {kor:a.find(x=>x==='화법과작문'||x==='언어와매체')||'',
+  math:a.find(x=>x==='확률과통계'||x==='미적분'||x==='기하')||'',
+  inquiry:a.filter(x=>!['화법과작문','언어와매체','확률과통계','미적분','기하'].includes(x)).slice(0,2)};
+};
+// 같은 이름이 여러 반에 있어도 임의로 다른 학생에 연결하지 않는다.
+findStudentForPdf=function(name,no,ban){
+ let a=S.students.filter(st=>st.name===name);
+ if(ban)a=a.filter(st=>Number(st.ban)===Number(ban));
+ if(no)a=a.filter(st=>Number(st.no)===Number(no));
+ return a.length===1?a[0]:null;
+};
+parseScorePdf=async function(file){
+ const pages=await pdfExtractPages(file),exam=detectPdfExam(pages,file.name);
+ const national=parseNationalPdf(pages,exam,file.name);
+ const evaluation=parseEvaluationPdf(pages,exam);
+ const records=national.length>evaluation.length?national:evaluation;
+ if(!records.length)throw new Error('학급별 성적일람표에서 학생별 등급을 찾지 못했습니다. 텍스트가 포함된 PDF인지 확인해 주세요.');
+ return {file:file.name,exam,records};
+};
+// ===== 호환 코드 끝 =====
+
 function savePdfScoreResult(parsed){
   let matched=0,unmatched=[];
   saveLocalPatch(d=>{
