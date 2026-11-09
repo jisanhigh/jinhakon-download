@@ -30,8 +30,9 @@ jobs:
         run: node scripts/test-score-storage.cjs
       - name: Test today's admissions calendar
         run: node scripts/test-schedule-today.cjs
+      # Original Go/Edge build only needs sql.js; omit unused Electron downloads.
       - name: Install offline SQLite runtime
-        run: npm install --no-audit --no-fund
+        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
       - name: Bundle HTML and SQLite in original launcher
         shell: pwsh
         run: |
