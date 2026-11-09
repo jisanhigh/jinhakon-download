@@ -992,9 +992,25 @@ function allEvents(){
  (S.manualEvents||[]).forEach((x,i)=>a.push({...x,cls:"memo",manual:i}));
  return a.filter(x=>/^\d{4}-\d{2}-\d{2}/.test(x.date)).sort((a,b)=>a.date.localeCompare(b.date))
 }
-function jumpCalendarToData(){
- const e=allEvents().find(x=>x.date);
- if(e){const [y,m]=e.date.split("-").map(Number);S.month=new Date(y,m-1,1)}
+function scheduleLocalDate(date=new Date()){
+ return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0");
+}
+function scheduleDatePlusDays(ymd,n){
+ const [y,m,d]=ymd.split("-").map(Number);
+ return scheduleLocalDate(new Date(y,m-1,d+n));
+}
+function resetScheduleToday(){
+ const now=new Date();
+ S.month=new Date(now.getFullYear(),now.getMonth(),1);
+ S.selectedDay=scheduleLocalDate(now);
+}
+function jumpCalendarToData(){resetScheduleToday()}
+function goTodaySchedule(){resetScheduleToday();renderSchedule()}
+function openScheduleDate(date){
+ const [y,m]=date.split("-").map(Number);
+ S.month=new Date(y,m-1,1);
+ S.selectedDay=date;
+ renderSchedule();
 }
 
 function addManualEvent(){
@@ -1007,16 +1023,17 @@ async function saveVaultSilent(){/* 암호화 저장은 비밀번호 재입력 �
 function moveMonth(n){S.month=new Date(S.month.getFullYear(),S.month.getMonth()+n,1);S.selectedDay="";renderSchedule()}
 function pickDay(d){S.selectedDay=d;renderSchedule()}
 renderSchedule=function(){
- const y=S.month.getFullYear(),m=S.month.getMonth(), first=new Date(y,m,1), start=new Date(y,m,1-first.getDay()), ev=allEvents(), today=new Date().toISOString().slice(0,10);
- const now=new Date(), isCurrent=(y===now.getFullYear()&&m===now.getMonth());
+ const now=new Date(),today=scheduleLocalDate(now);
+ const y=S.month.getFullYear(),m=S.month.getMonth(), first=new Date(y,m,1), start=new Date(y,m,1-first.getDay()), ev=allEvents();
+ const isCurrent=(y===now.getFullYear()&&m===now.getMonth());
  let cells="";
  for(let i=0;i<42;i++){
    const d=new Date(start);d.setDate(start.getDate()+i);
    const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`, es=ev.filter(x=>x.date===ds);
    cells+=`<div class="day ${d.getMonth()!==m?"out":""} ${ds===today?"today":""} ${S.selectedDay===ds?"sel":""}" onclick="pickDay('${ds}')"><div class=dnum>${d.getDate()}</div>${es.slice(0,4).map(x=>`<span class="ev ${x.cls}">${esc(x.type)} ${esc(x.title)}</span>`).join("")}${es.length>4?`<span class=ev>+${es.length-4}건</span>`:""}</div>`;
  }
- const sel=S.selectedDay||today, dayEv=ev.filter(x=>x.date===sel);
- $("#scheduleView").innerHTML=`<div class=pagehead><div><h2>진학업무 달력</h2><p>면접·실기·논술·적성·1단계 발표·최종발표와 추가한 일정을 한 달력에서 확인합니다.</p></div><button class="primary no-print" onclick=addManualEvent()>+ 일정 추가</button></div>
+ const sel=S.selectedDay||(isCurrent?today:scheduleLocalDate(first)), dayEv=ev.filter(x=>x.date===sel);
+ $("#scheduleView").innerHTML=`<div class=pagehead><div><h2>전형 일정 달력</h2><p>오늘을 기준으로 면접·실기·논술·적성·1단계 발표·최종발표 일정을 확인합니다.</p></div><button class="primary no-print" onclick=addManualEvent()>+ 일정 추가</button></div>
  <div class=card>
    <div class=calbar>
      <div></div>
@@ -1025,7 +1042,7 @@ renderSchedule=function(){
        <h3>${y}년 ${m+1}월</h3>
        <button class="secondary month-arrow" onclick=moveMonth(1) aria-label="다음 달">›</button>
      </div>
-     <button class="secondary month-current ${isCurrent?"":"show"}" onclick="S.month=new Date();S.selectedDay='';renderSchedule()">이번 달</button>
+     <button class="secondary month-current show" onclick=goTodaySchedule() title="오늘 날짜로 이동">오늘</button>
    </div>
    <div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px">
      <span class="ev interview" style="display:inline-block">면접</span>
@@ -1039,6 +1056,13 @@ renderSchedule=function(){
  </div>
  <div class=card style="margin-top:14px"><h3>${sel} 일정</h3>${dayEv.length?`<table><thead><tr><th>구분</th><th>학생/대학/내용</th><th></th></tr></thead><tbody>${dayEv.map(x=>`<tr><td><span class="badge ${x.cls==="announce"?"good":x.cls==="essay"?"bad":"warn"}" style="${x.cls==="practical"?"background:#f1e9ff;color:#6841a5":x.cls==="aptitude"?"background:#e8f2ff;color:#2e5f9b":""}">${esc(x.type)}</span></td><td>${x.row?`${x.row.ban}반 ${x.row.no}번 <span class=pname>${esc(x.row.name)}</span> · ${esc(x.row.university)} · ${esc(x.row.major)}`:esc(x.title)}</td><td>${x.manual!=null?`<button class=secondary onclick=deleteManual(${x.manual})>삭제</button>`:""}</td></tr>`).join("")}</tbody></table>`:"<p style='color:var(--muted)'>등록된 일정이 없습니다.</p>"}</div>`;
 }
+
+// 전형 일정 탭을 다시 열 때마다 PC 현지 날짜로 이동한다.
+const _scheduleTodayPreviousSwitch=switchView;
+switchView=function(view){
+ if(view==="schedule")resetScheduleToday();
+ return _scheduleTodayPreviousSwitch(view);
+};
 
 const oldRenderStudent=renderStudent;
 renderStudent=function(){
@@ -1203,7 +1227,7 @@ const db=$("#demoBtn");if(db)db.remove();
 
 
 // ===== 진학ON v5 관리자 설정 / 유지보수 =====
-const APP_VERSION="1.0.9";
+const APP_VERSION="1.0.10";
 const SETTINGS_KEY="jinhakON.settings.v5";
 
 const DEFAULT_SETTINGS={
