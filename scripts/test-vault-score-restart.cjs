@@ -23,7 +23,7 @@ function deepMerge(a,b){
 }
 function setup({snapshot,liveLibrary,liveState,libraryExists=true}){
   const db=new Map(),KEY='jinhakON.v1',LIB='jinhakON.scoreLibrary.v1.2027',VAULT='jinhakON.vault.v2';
-  db.set(VAULT,JSON.stringify({mode:'gate',data:snapshot}));
+  db.set(VAULT,JSON.stringify({mode:'gate',hash:'hash',data:snapshot}));
   if(libraryExists)db.set(LIB,JSON.stringify(liveLibrary));
   if(liveState)db.set(KEY,JSON.stringify(liveState));
   const alerts=[];
