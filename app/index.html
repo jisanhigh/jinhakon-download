@@ -1203,7 +1203,7 @@ const db=$("#demoBtn");if(db)db.remove();
 
 
 // ===== 진학ON v5 관리자 설정 / 유지보수 =====
-const APP_VERSION="1.0.8";
+const APP_VERSION="1.0.9";
 const SETTINGS_KEY="jinhakON.settings.v5";
 
 const DEFAULT_SETTINGS={
@@ -2426,9 +2426,10 @@ async function importScorePdfs(files){
   const labels=reports.map(x=>x.exam.label);if(labels.length)S.minExam=labels[labels.length-1];
   render();
   setSheet("성적 PDF 불러오기 완료",`
-    ${reports.map(x=>`<div class=card style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px"><b>${esc(x.exam.title)}</b><span class="badge good">${x.saved.matched}/${x.saved.total}명 연결</span></div>
+    ${reports.map(x=>`<div class=card style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px"><b>${esc(x.exam.title)}</b><span class="badge good">${x.saved.verified}/${x.saved.total}명 저장 확인</span></div>
       <div style="font-size:12px;color:var(--muted);margin-top:6px">${esc(x.file)} · ${esc(x.exam.kind)}</div>
-      ${x.saved.unmatched.length?`<div class=sheet-note style="margin-top:9px">미연결: ${esc(x.saved.unmatched.join(", "))}</div>`:""}</div>`).join("")}
+      ${x.saved.unmatched.length?`<div class=sheet-note style="margin-top:9px">미연결: ${esc(x.saved.unmatched.join(", "))}</div>`:""}
+      ${x.saved.warnings?.length?`<div class=sheet-note style="margin-top:9px">학생 번호 확인: ${esc(x.saved.warnings.join(", "))}</div>`:""}</div>`).join("")}
     ${fail.map(x=>`<div class=card style="margin-bottom:10px;border-color:#efcdd2"><b>${esc(x.file)}</b><div style="font-size:12px;color:#ad4f5b;margin-top:6px">${esc(x.msg)}</div></div>`).join("")}
     <div class=sheet-actions><button class=primary onclick="closeModal();switchView('minimum')">수능최저 결과 보기</button></div>
   `);
@@ -3281,32 +3282,84 @@ saveSession=function(){
 };
 
 // PDF 저장 함수: 작업 저장소 + 독립 성적 라이브러리에 동시에 보관.
-savePdfScoreResult=function(parsed){
-  let matched=0,unmatched=[],newMocks={};
-  saveLocalPatch(d=>{
-    d.mocks=d.mocks||{};
-    for(const r of parsed.records){
-      const st=findStudentForPdf(r.name,r.no,r.ban);
-      if(!st){unmatched.push(`${r.ban?`${r.ban}반 `:""}${r.no?`${r.no}번 `:""}${r.name}`);continue}
-      const data={
-        kor:r.kor,math:r.math,eng:r.eng,inq1:r.inq1,inq2:r.inq2,hist:r.hist,foreign:r.foreign||"",
-        korSel:r.korSel||"",mathSel:r.mathSel||"",inqSel1:r.inqSel1||"",inqSel2:r.inqSel2||"",
-        source:"PDF",sourceFile:parsed.file,kind:parsed.exam.kind,importedAt:new Date().toISOString()
-      };
-      d.mocks[st.key]=d.mocks[st.key]||{};
-      d.mocks[st.key][parsed.exam.label]=data;
-      newMocks[st.key]=newMocks[st.key]||{};
-      newMocks[st.key][parsed.exam.label]=data;
-      matched++;
+// 학급별 명렬의 번호가 다를 경우 동일 학급·이름 한 명만 보수적으로 연결.
+function matchPdfStudentForSave(rec){
+  const norm=x=>String(x||"").normalize("NFC").replace(/\s+/g,"");
+  const matches=S.students.filter(st=>norm(st.name)===norm(rec.name));
+  if(!matches.length)return {student:null,reason:"대교협 학생 목록에 이름 없음"};
+  const ban=Number(rec.ban)||0,no=Number(rec.no)||0;
+  const inClass=ban?matches.filter(st=>Number(st.ban)===ban):matches;
+  if(!inClass.length)return {student:null,reason:"대교협 학생 목록과 학급 불일치"};
+  if(ban){
+    const exact=no?inClass.filter(st=>Number(st.no)===no):[];
+    if(exact.length===1)return {student:exact[0],reason:""};
+    if(inClass.length===1){
+      const st=inClass[0],reason=no&&Number(st.no)!==no?"PDF "+no+"번 → 대교협 "+st.no+"번 (동일 반·이름)":"";
+      return {student:st,reason};
     }
-  });
-  persistMocksToLibrary(newMocks,{
-    exam:parsed.exam.label,
-    kind:parsed.exam.kind,
-    count:matched,
-    files:[parsed.file]
-  });
-  return {matched,unmatched,total:parsed.records.length};
+    return {student:null,reason:"동명이인 또는 번호 중복으로 연결 보류"};
+  }
+  if(matches.length===1){
+    const st=matches[0],reason=no&&Number(st.no)!==no?"PDF "+no+"번 → 대교협 "+st.no+"번 (이름 유일)":"";
+    return {student:st,reason};
+  }
+  return {student:null,reason:"학급 정보가 없어 동명이인을 구분할 수 없음"};
+}
+// 실제 저장 후 읽어 확인하고, 저장에 실패한 경우 성공으로 표시하지 않는다.
+savePdfScoreResult=function(parsed){
+  const exam=String((parsed.exam||{}).label||"").trim();
+  if(!/^(?:[1-9]|1[0-2])월$/.test(exam))
+    throw new Error("시험 월을 확인하지 못했습니다. PDF의 시행 월을 확인해 주세요.");
+  const newMocks={},unmatched=[],warnings=[],used=new Set();
+  for(const r of parsed.records){
+    const matched=matchPdfStudentForSave(r),st=matched.student;
+    const source=(r.ban?r.ban+"반 ":"")+(r.no?r.no+"번 ":"")+r.name;
+    if(!st){unmatched.push(source+" ("+matched.reason+")");continue}
+    if(used.has(st.key)){unmatched.push(source+" (동일 학생 중복행)");continue}
+    const grades=["kor","math","eng","hist","inq1","inq2"];
+    const data={
+      kor:Number(r.kor)||0,math:Number(r.math)||0,eng:Number(r.eng)||0,
+      inq1:Number(r.inq1)||0,inq2:Number(r.inq2)||0,hist:Number(r.hist)||0,
+      foreign:r.foreign||"",
+      korSel:r.korSel||"",mathSel:r.mathSel||"",inqSel1:r.inqSel1||"",inqSel2:r.inqSel2||"",
+      source:"PDF",sourceFile:parsed.file,kind:parsed.exam.kind,importedAt:new Date().toISOString()
+    };
+    if(grades.some(k=>!Number.isInteger(data[k])||data[k]<0||data[k]>9)||grades.filter(k=>data[k]>=1).length<5){
+      unmatched.push(source+" (등급 누락 또는 범위 오류)");continue;
+    }
+    used.add(st.key);newMocks[st.key]={[exam]:data};
+    if(matched.reason)warnings.push(source+": "+matched.reason);
+  }
+  const total=parsed.records.length,matched=used.size;
+  if(!matched)throw new Error("PDF "+total+"명은 읽었으나 저장된 학생이 0명입니다. 반·번호·이름을 확인해 주세요. "+unmatched.slice(0,4).join("; "));
+  const libKey=scoreLibraryKey(),oldLib=localStorage.getItem(libKey),oldLocal=localStorage.getItem(KEY);
+  const lib=readScoreLibrary(),local=getLocalState();
+  lib.mocks=mergeDeepMocks(lib.mocks,newMocks);lib.imports=lib.imports||{};
+  const prev=lib.imports[exam]||{};
+  const count=Object.values(lib.mocks).filter(x=>x&&x[exam]&&["kor","math","eng","inq1","inq2","hist"].some(k=>x[exam][k])).length;
+  lib.imports[exam]={
+    ...prev,label:exam,kind:parsed.exam.kind||prev.kind||"",
+    updatedAt:new Date().toISOString(),count,
+    files:[...new Set([...(prev.files||[]),parsed.file])]
+  };
+  local.mocks=mergeDeepMocks(local.mocks,newMocks);
+  const restore=(key,value)=>{
+    try{if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value)}catch(_){}
+  };
+  try{
+    localStorage.setItem(libKey,JSON.stringify(lib));
+    localStorage.setItem(KEY,JSON.stringify(local));
+    const stored=getMockStore(),library=readScoreLibrary().mocks;
+    for(const [key,exams] of Object.entries(newMocks)){
+      const expected=exams[exam],actual=(stored[key]||{})[exam],disk=(library[key]||{})[exam];
+      if(!actual||!disk||["kor","math","eng","hist","inq1","inq2"].some(f=>actual[f]!==expected[f]||disk[f]!==expected[f]))
+        throw new Error("저장 후 재조회 결과가 일치하지 않습니다.");
+    }
+  }catch(e){
+    restore(libKey,oldLib);restore(KEY,oldLocal);
+    throw new Error("성적 저장 실패: "+(e.message||e)+". 브라우저 저장 공간 및 설정을 확인해 주세요.");
+  }
+  return {matched,verified:matched,unmatched,warnings,total};
 };
 
 function scoreLibrarySummary(){
