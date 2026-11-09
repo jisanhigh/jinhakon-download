@@ -10,7 +10,7 @@ const js=html.slice(begin+8,end);
 new vm.Script(js,{filename:'app/index.html'});
 const checks=[
  ['no sidebar audit', 'onclick="switchView(\'audit\')"'],
- ['version','const APP_VERSION="1.0.10"'],
+ ['version','const APP_VERSION="1.0.11"'],
  ['exact admission','function exactAdmission(r)'],
  ['unique application key','const appKey=r=>["JK2"'],
  ['legacy migration','function jFixMigrateState()'],
@@ -27,9 +27,11 @@ const checks=[
  ['local date for calendar','function scheduleLocalDate(date=new Date())'],
  ['calendar opens today','function resetScheduleToday()'],
  ['upcoming 14 days','function scheduleUpcomingHtml(events,today)'],
- ['calendar today button','onclick=goTodaySchedule()']
+ ['calendar today button','onclick=goTodaySchedule()'],
+ ['prevent PIN score rollback','if(!libraryExists && d.scoreLibrary)writeScoreLibrary(d.scoreLibrary);'],
+ ['restore score library precedence','const currentMocks=libraryExists']
 ];
 for(const [name,needle] of checks){if(!html.includes(needle))throw Error('Missing '+name)}
 if (html.includes('class="navbtn" data-view="audit"')) throw Error('Audit must not be in sidebar');
 if (html.includes('["audit","전형 점검"]')) throw Error('Audit must not be a user-toggle menu');
-console.log('v1.0.10 source verified:',checks.map(x=>x[0]).join(', '));
+console.log('v1.0.11 source verified:',checks.map(x=>x[0]).join(', '));
