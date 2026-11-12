@@ -12,11 +12,11 @@ const code=html.slice(a+start.length,b);
 let reads=0, snapshots=0;
 const ctx={
   loadLocal(){reads++;return {mocks:{student:{'9월':{kor:1}}}};},
-  getMockStore(){return this.loadLocal().mocks;},
-  availableExamLabels(){return Object.keys(this.getMockStore().student);},
-  render(){this.loadLocal();this.getMockStore();this.getMockStore();this.availableExamLabels();this.availableExamLabels();},
-  renderMinimum(){this.getMockStore();this.getMockStore();this.availableExamLabels();},
-  openMockEditor(){this.getMockStore();this.getMockStore();},
+  getMockStore(){return ctx.loadLocal().mocks;},
+  availableExamLabels(){return Object.keys(ctx.getMockStore().student);},
+  render(){ctx.loadLocal();ctx.getMockStore();ctx.getMockStore();ctx.availableExamLabels();ctx.availableExamLabels();},
+  renderMinimum(){ctx.getMockStore();ctx.getMockStore();ctx.availableExamLabels();},
+  openMockEditor(){ctx.getMockStore();ctx.getMockStore();},
 };
 vm.createContext(ctx);
 vm.runInContext(code,ctx);
