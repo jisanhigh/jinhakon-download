@@ -4091,6 +4091,34 @@ loginVault=async function(){
 };
 if($('#loginBtn'))$('#loginBtn').onclick=loginVault;
 // 백업 복원은 원본 함수에서 마이그레이션을 실행하도록 보강했습니다.
+// ===== v1.0.12: read-once rendering optimization =====
+(function(){
+  const loadBase=loadLocal;
+  const mocksBase=getMockStore;
+  const labelsBase=availableExamLabels;
+  const renderBase=render;
+  const minimumBase=renderMinimum;
+  const editorBase=openMockEditor;
+  let depth=0, localMemo, mocksMemo, labelsMemo;
+  function clear(){localMemo=undefined;mocksMemo=undefined;labelsMemo=undefined;}
+  function batched(fn){return function(...args){
+    if(depth++===0)clear();
+    try{return fn.apply(this,args)}
+    finally{if(--depth===0)clear();}
+  };}
+  loadLocal=function(){
+    return depth ? (localMemo===undefined ? (localMemo=loadBase()) : localMemo) : loadBase();
+  };
+  getMockStore=function(){
+    return depth ? (mocksMemo===undefined ? (mocksMemo=mocksBase()) : mocksMemo) : mocksBase();
+  };
+  availableExamLabels=function(){
+    return depth ? (labelsMemo===undefined ? (labelsMemo=labelsBase()) : labelsMemo) : labelsBase();
+  };
+  renderMinimum=batched(minimumBase);
+  render=batched(renderBase);
+  openMockEditor=batched(editorBase);
+})();
 render();
 
 </script>
