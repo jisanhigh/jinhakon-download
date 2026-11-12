@@ -7,7 +7,6 @@
 - [기존 설치판 덮어쓰기·데이터 보존 안내](docs/ORIGINAL_UPDATE.md)
 - [정식 v1.0.12 설치파일](https://github.com/jisanhigh/jinhakon-download/releases/latest)
 - [v1.0.12 릴리스 안내](docs/RELEASE_NOTES_1.0.12.md)
-- [속도 개선 사항](docs/RELEASE_NOTES_1.0.12.md)
 - [GitHub Actions 자동 빌드](../../actions/workflows/build-windows.yml)
 - [CalendarTask 설치 및 DB 사용](docs/CALENDARTASK.md)
 - [배포 점검표](docs/RELEASE_CHECKLIST.md)
