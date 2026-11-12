@@ -9,7 +9,7 @@ const end='\nrender();\n\n</script>';
 const a=html.indexOf(start), b=html.indexOf(end,a);
 assert.ok(a>=0 && b>a, 'render cache wrapper must exist');
 const code=html.slice(a+start.length,b);
-let reads=0, snapshots=0;
+let reads=0;
 const ctx={
   loadLocal(){reads++;return {mocks:{student:{'9월':{kor:1}}}};},
   getMockStore(){return ctx.loadLocal().mocks;},
