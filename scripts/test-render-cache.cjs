@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 
-const html=fs.readFileSync('app/index.html','utf8');
+const html=fs.readFileSync('app/index.html','utf8').replace(/\r\n/g,'\n');
 const start='// ===== v1.0.12: read-once rendering optimization =====';
 const end='\nrender();\n\n</script>';
 const a=html.indexOf(start), b=html.indexOf(end,a);
